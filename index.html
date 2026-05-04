@@ -1920,6 +1920,20 @@ function buildTimeline() {
     dateMap[ev.date].push(ev.club);
   });
 
+  // GB camp date ranges for conflict checking
+  var GB_CAMPS = [
+    { name:'Gamebreakers \u2013 Loomis Chaffee',     s:'2026-06-29', e:'2026-07-02' },
+    { name:'Gamebreakers \u2013 Springfield College', s:'2026-07-06', e:'2026-07-09' },
+    { name:'Gamebreakers \u2013 Ethel Walker',        s:'2026-08-03', e:'2026-08-06' },
+  ];
+  function getGBClashes(dateStr) {
+    var hits = [];
+    GB_CAMPS.forEach(function(camp) {
+      if (dateStr >= camp.s && dateStr <= camp.e) hits.push(camp.name);
+    });
+    return hits;
+  }
+
   // Build HTML grouped by month
   var byMonth = {};
   sorted.forEach(function(ev) {
@@ -1944,19 +1958,26 @@ function buildTimeline() {
 
       var clubsOnDay = dateMap[ev.date] || [];
       var uniqueClubs = clubsOnDay.filter(function(c,i){ return clubsOnDay.indexOf(c)===i; });
-      var isClash = uniqueClubs.length > 1;
+      var gbHits = getGBClashes(ev.date);
+      var isClash = uniqueClubs.length > 1 || gbHits.length > 0;
       if (isClash) clashCount++;
 
       var clashNote = '';
       var clashBanner = '';
       if (isClash) {
-        var others = uniqueClubs.filter(function(c){ return c !== ev.club; });
-        clashBanner = '<div class="sched-clash-banner">';
-        clashBanner += '\u26a0\ufe0f SCHEDULING CONFLICT';
-        clashBanner += '</div>';
-        clashNote = '<div class="sched-clash-note">';
-        clashNote += '\u274c Same day as: <strong>' + others.join('</strong> and <strong>') + '</strong>';
-        clashNote += '</div>';
+        var clashLines = [];
+        var otherClubs = uniqueClubs.filter(function(c){ return c !== ev.club; });
+        if (otherClubs.length > 0) {
+          clashLines.push('\u274c Same day as: <strong>' + otherClubs.join('</strong> &amp; <strong>') + '</strong>');
+        }
+        gbHits.forEach(function(camp) {
+          clashLines.push('\u26fa\ufe0f During: <strong>' + camp + '</strong>');
+        });
+        var bannerText = [];
+        if (otherClubs.length > 0) bannerText.push('TRYOUT CLASH');
+        if (gbHits.length > 0) bannerText.push('CAMP CONFLICT');
+        clashBanner = '<div class="sched-clash-banner">\u26a0\ufe0f ' + bannerText.join(' + ') + ' \u26a0\ufe0f</div>';
+        clashNote = clashLines.map(function(l){ return '<div class="sched-clash-note">' + l + '</div>'; }).join('');
       }
 
       var venue = VENUES.filter(function(v){ return v.key === ev.venueKey; })[0];
